@@ -88,3 +88,14 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+# macos
+.DS_Store
+
+# project
+.projectile
+Luma
+Cb
+Cr
+sps.json
+pps_1.json

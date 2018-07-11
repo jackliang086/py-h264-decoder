@@ -13,7 +13,7 @@ def Clip3(x, y, z):
         return y
     else:
         return z
-        
+
 def Clip1_Y(x, BitDepth_Y):
     return Clip3(0, (1 << BitDepth_Y) - 1, x)
 
@@ -64,8 +64,7 @@ def pic_paint(img, fname):
         h = len(img[0])
         for x in range(h):
             for y in range(w):
-                print('{0:3d} '.format(img[y][x]), end='', file=outfile)
-            print('', file=outfile)
+                print('{:d}'.format(img[y][x]), file=outfile)
 
 def mat_mult(a, b):
     n = len(a)

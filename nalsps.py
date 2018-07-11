@@ -15,7 +15,7 @@ class SPS:
         assert self.rbsp_stop_one_bit == 1
         # self.params["rbsp_alignment_zero_bit"] = self.bits[self.bits.pos:].int
         while not self.bits.byte_aligned():
-            assert self.bits.f(1) == 0  
+            assert self.bits.f(1) == 0
 
     def parse(self):
         self.seq_parameter_set_rbsp()

@@ -174,7 +174,7 @@ class H264Bits:
         else:
             (t1s, tc) = ((idx-6)%4, (idx-6)//4+3)
         return (t1s, tc, token)
-        
+
     def ce_level_prefix(self):
         zeros = 0
         while self.bits.read(1).uint == 0:

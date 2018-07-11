@@ -12,7 +12,7 @@ class Slice:
         assert self.rbsp_stop_one_bit == 1
         # self.params["rbsp_alignment_zero_bit"] = self.bits[self.bits.pos:].int
         while not self.bits.byte_aligned():
-            assert self.bits.f(1) == 0  
+            assert self.bits.f(1) == 0
 
     def __init__(self, bits, sps, ppss, params):
         self.bits = bits
@@ -147,7 +147,7 @@ class Slice:
                         break
         if self.slice_type_int % 5 == 1 :
             self.ref_pic_list_modification_flag_l1 = self.bits.u(1)
-            if self.ref_pic_list_modification_flag_l1: 
+            if self.ref_pic_list_modification_flag_l1:
                 while True :
                     self.modification_of_pic_nums_idc = self.bits.ue()
                     if (self.modification_of_pic_nums_idc == 0) or \
@@ -187,7 +187,7 @@ class Slice:
                         break
 
     def NextMbAddress(self,n):
-        i=n+1 
+        i=n+1
         while i < self.PicSizeInMbs and self.MbToSliceGroupMap[i] != self.MbToSliceGroupMap[n] :
             i += 1
         return i
@@ -225,9 +225,9 @@ class Slice:
                     mapUnitToSliceGroupMap[i] = self.num_slice_groups_minus1
                 iGroup = self.num_slice_groups_minus1 - 1
                 while iGroup >= 0:
-                    yTopLeft = self.top_left[ iGroup ] / self.PicWidthInMbs 
-                    xTopLeft = self.top_left[ iGroup ] % self.PicWidthInMbs 
-                    yBottomRight = self.bottom_right[ iGroup ] / self.PicWidthInMbs 
+                    yTopLeft = self.top_left[ iGroup ] / self.PicWidthInMbs
+                    xTopLeft = self.top_left[ iGroup ] % self.PicWidthInMbs
+                    yBottomRight = self.bottom_right[ iGroup ] / self.PicWidthInMbs
                     xBottomRight = self.bottom_right[ iGroup ] % self.PicWidthInMbs
                     for y in range(yTopLeft, yBottomRight+1):
                         for x in range(xTopLeft, xBottomRight+1):
@@ -244,25 +244,25 @@ class Slice:
                 ( xDir, yDir ) = ( self.slice_group_change_direction_flag - 1, self.slice_group_change_direction_flag )
                 k = 0
                 while k < self.MapUnitsInSliceGroup0 :
-                    mapUnitVacant = ( mapUnitToSliceGroupMap[ y * self.PicWidthInMbs + x ] == 1 ) 
+                    mapUnitVacant = ( mapUnitToSliceGroupMap[ y * self.PicWidthInMbs + x ] == 1 )
                     if mapUnitVacant :
-                        mapUnitToSliceGroupMap[ y * self.PicWidthInMbs + x ] = 0 
+                        mapUnitToSliceGroupMap[ y * self.PicWidthInMbs + x ] = 0
                     if xDir == -1 and x == leftBound :
-                        leftBound = max( leftBound - 1, 0 ) 
-                        x = leftBound 
+                        leftBound = max( leftBound - 1, 0 )
+                        x = leftBound
                         ( xDir, yDir ) = ( 0, 2 * self.slice_group_change_direction_flag - 1 )
                     elif xDir == 1 and x == rightBound :
                         rightBound = min( rightBound + 1, self.PicWidthInMbs - 1 )
                         x = rightBound
-                        ( xDir, yDir ) = ( 0, 1 - 2 * self.slice_group_change_direction_flag ) 
+                        ( xDir, yDir ) = ( 0, 1 - 2 * self.slice_group_change_direction_flag )
                     elif yDir == -1 and y == topBound :
                         topBound = max( topBound - 1, 0 )
-                        y = topBound 
-                        ( xDir, yDir ) = ( 1 - 2 * self.slice_group_change_direction_flag, 0 ) 
-                    elif yDir == 1 and y == bottomBound : 
-                        bottomBound = min( bottomBound + 1, self.PicHeightInMapUnits - 1 ) 
-                        y = bottomBound 
-                        ( xDir, yDir ) = ( 2 * self.slice_group_change_direction_flag - 1, 0 ) 
+                        y = topBound
+                        ( xDir, yDir ) = ( 1 - 2 * self.slice_group_change_direction_flag, 0 )
+                    elif yDir == 1 and y == bottomBound :
+                        bottomBound = min( bottomBound + 1, self.PicHeightInMapUnits - 1 )
+                        y = bottomBound
+                        ( xDir, yDir ) = ( 2 * self.slice_group_change_direction_flag - 1, 0 )
                     else :
                         ( x, y ) = ( x + xDir, y + yDir )
             elif self.slice_group_map_type == 4:
@@ -306,7 +306,7 @@ class Slice:
             if self.slice_type != "I" and self.slice_type != "SI" :
                 if not self.pps.entropy_coding_mode_flag :
                     self.mb_skip_run = self.bits.ue()
-                    prevMbSkipped = self.mb_skip_run > 0 
+                    prevMbSkipped = self.mb_skip_run > 0
                     for i in range(self.mb_skip_run) :
                         self.mbs.append(Macroblock(self, len(self.mbs), pskip=True))
                         self.CurrMbAddr = self.NextMbAddress( self.CurrMbAddr )
@@ -334,4 +334,3 @@ class Slice:
             self.CurrMbAddr = self.NextMbAddress(self.CurrMbAddr)
             if not moreDataFlag:
                 break
-
