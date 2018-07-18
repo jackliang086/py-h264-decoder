@@ -98,8 +98,8 @@ class H264Bits:
                 ['11','000','001','011','010','101','100'],
                 ['111','110','101','100','011','010','001','0001','00001','000001','0000001','00000001','000000001','0000000001','00000000001']]
 
-    def __init__(self, bits):
-        self.bits = bits[24:]
+    def __init__(self, bits, debug=False):
+        self.bits = bits if debug else bits[24:]
 
     def u(self,n):
         return self.bits.read(n).uint
@@ -207,6 +207,9 @@ class H264Bits:
         print("ae() not IMPL yet")
         assert False
 
+    def next_bits(self, n):
+        return self.bits.peek(n).uint
+
     def more_data(self):
         return self.bits.pos < self.bits.length
 
@@ -231,8 +234,9 @@ class H264Bits:
 
 if __name__ == "__main__":
     from bitstring import BitStream
-    raw = BitStream("0b110010000100")
-    bs = H264Bits(raw)
+    raw = BitStream('0b110010000100')
+    bs = H264Bits(raw, debug=True)
+    print(bs.next_bits(2))
     print(bs.u(1))
     print(bs.f(1))
     print(bs.ue())
