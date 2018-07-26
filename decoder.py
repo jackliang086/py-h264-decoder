@@ -62,12 +62,11 @@ if __name__ == '__main__':
             dump_params(pps, fname)
         elif params["nal_unit_type"] in [1, 5]: # Slice
             slice = Slice(nb, sps = sps, ppss = ppss, params = params)
-            decode_slice(slice)
-            break
+            # decode_slice(slice)
             slices.append(slice)
-            dump_mbs(slice, "slice_" + str(len(slices)) + "_mb.json")
-            fname = "slice_" + str(len(slices)) + ".json"
-            dump_params(slice, fname)
+            # dump_mbs(slice, "slice_" + str(len(slices)) + "_mb.json")
+            # fname = "slice_" + str(len(slices)) + ".json"
+            # dump_params(slice, fname)
         elif params['nal_unit_type'] == 6: #SEI
             sei = SEI(nb, params)
         else:

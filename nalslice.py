@@ -129,6 +129,9 @@ class Slice:
         self.S_prime_Cr = array_2d(self.PicWidthInSamples_C, self.PicHeightInSamples_C, 0)
         self.mb_to_slice_group_map()
 
+        self.mb_field_decoding_flag = 0
+        self.num_ref_idx_l1_active_minus1 = 0 # this project not support b slice
+
     def ref_pic_list_mvc_modification(self):
         print("ref_pic_list_mvc_modification NOT IMPL")
 

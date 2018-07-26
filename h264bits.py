@@ -122,6 +122,9 @@ class H264Bits:
         return (-1)**(k+1) * ceil(k/2)
 
     def me(self, mb_pred_mode, chroma_array_type):
+        if mb_pred_mode == 'Pred_L0':
+            mb_pred_mode = 'Inter'
+
         if chroma_array_type in [1, 2]:
             if mb_pred_mode in ["Intra8x8", "Intra4x4"]:
                 table = H264Bits.table9_4a_intra
