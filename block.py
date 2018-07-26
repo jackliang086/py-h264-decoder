@@ -142,7 +142,7 @@ class Block:
                 cb4x4BlkIdx = 0
             elif mode == "CrIntra16x16DC":
                 cr4x4BlkIdx = 0
-            if self.mb.pred_mode == "Intra16x16" or (self.color == "Y" and self.size == "4x4"):
+            if self.mb.pred_mode == 'Intra_16x16' or (self.color == "Y" and self.size == "4x4"):
                 (mbAddrA, blkIdxA) = self.luma_neighbor("A")
                 # print("      BLOCK A:",mbAddrA, blkIdxA)
                 blkA = None if mbAddrA == None else self.slice.mbs[mbAddrA].luma_blocks[blkIdxA]

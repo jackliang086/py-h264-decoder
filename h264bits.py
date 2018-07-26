@@ -126,12 +126,12 @@ class H264Bits:
             mb_pred_mode = 'Inter'
 
         if chroma_array_type in [1, 2]:
-            if mb_pred_mode in ["Intra8x8", "Intra4x4"]:
+            if mb_pred_mode in ['Intra_8x8', 'Intra_4x4']:
                 table = H264Bits.table9_4a_intra
             elif mb_pred_mode == "Inter":
                 table = H264Bits.table9_4a_inter
         else:
-            if mb_pred_mode in ["Intra8x8", "Intra4x4"]:
+            if mb_pred_mode in ['Intra_8x8', 'Intra_4x4']:
                 table = H264Bits.table9_4b_intra
             elif mb_pred_mode == "Inter":
                 table = H264Bits.table9_4b_inter

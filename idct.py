@@ -256,9 +256,9 @@ def scaling_for_4x4(bitDepth, qP, c, blk):
             else:
                 d[i][j] = (c[i][j] * LevelScale4x4[qP%6][i][j] + 2**(3-qP//6)) >> (4 - qP//6)
             if i == 0 and j == 0 and \
-                    ((blk.color == "Y" and "Intra16x16" in blk.mb.pred_mode) or blk.color in ["Cb","Cr"]):
+                    ((blk.color == "Y" and 'Intra_16x16' in blk.mb.pred_mode) or blk.color in ["Cb","Cr"]):
                 d[0][0] = c[0][0]
-    # if (blk.color == "Y" and "Intra16x16" in blk.mb.pred_mode) or blk.color in ["Cb","Cr"]:
+    # if (blk.color == "Y" and 'Intra_16x16' in blk.mb.pred_mode) or blk.color in ["Cb","Cr"]:
     #     d[0][0] = c[0][0]
     return d
 

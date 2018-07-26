@@ -6,11 +6,11 @@ import idct
 def luma_pred(mb):
     # print("decoding mb ", mb.idx)
     MvCnt = 0
-    if mb.pred_mode == "Intra4x4":
+    if mb.pred_mode == 'Intra_4x4':
         intra_4x4_luma(mb)
-    elif mb.pred_mode == "Intra8x8":
+    elif mb.pred_mode == 'Intra_8x8':
         raise NameError("8x8 not impl")
-    elif mb.pred_mode == "Intra16x16":
+    elif mb.pred_mode == 'Intra_16x16':
         intra_16x16_luma(mb)
     # else:
     #     raise NameError("8.3.4")
@@ -42,17 +42,17 @@ def gen_intra_4x4_pred_mode(blk):
     else:
         dcPredModePredictedFlag = 0
     #3 derive MxMPredMode(A|B)
-    if dcPredModePredictedFlag == 1 or (not (mbs[mbAddrA].pred_mode in ["Intra4x4", "Intra8x8"])):
+    if dcPredModePredictedFlag == 1 or (not (mbs[mbAddrA].pred_mode in ['Intra_4x4', 'Intra_8x8'])):
         intraMxMPredModeA = 2
     else:
-        if mbs[mbAddrA].pred_mode == "Intra4x4":
+        if mbs[mbAddrA].pred_mode == 'Intra_4x4':
             intraMxMPredModeA = mbs[mbAddrA].luma_blocks[blkIdxA].Intra4x4PredMode
         else:
             raise NameError("8x8 not impl")
-    if dcPredModePredictedFlag == 1 or (not (mbs[mbAddrB].pred_mode in ["Intra4x4", "Intra8x8"])):
+    if dcPredModePredictedFlag == 1 or (not (mbs[mbAddrB].pred_mode in ['Intra_4x4', 'Intra_8x8'])):
         intraMxMPredModeB = 2
     else:
-        if mbs[mbAddrB].pred_mode == "Intra4x4":
+        if mbs[mbAddrB].pred_mode == 'Intra_4x4':
             intraMxMPredModeB = mbs[mbAddrB].luma_blocks[blkIdxB].Intra4x4PredMode
         else:
             raise NameError("8x8 not impl")
