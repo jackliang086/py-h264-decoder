@@ -16,12 +16,17 @@ class Macroblock:
         self.var = {}
         if pskip:
             self.mb_type_int = 5
+            self.mb_type = 'P_Skip'
         else:
             self.mb_type_int = self.slice.bits.ue()
         if self.slice.slice_type == "I":
             self.mb_type = mbtype_islice_table[self.mb_type_int]
         elif self.slice.slice_type == "P":
-            self.mb_type = mbtype_pslice_table[self.mb_type_int]
+            if not pskip:
+                if self.mb_type_int > 4:
+                    self.mb_type = mbtype_islice_table[self.mb_type_int - 5]
+                else:
+                    self.mb_type = mbtype_pslice_table[self.mb_type_int]
             print(str(self.idx) + ' ' + self.mb_type)
             # TODO the intra macroblock in p slice
         else:
@@ -38,7 +43,7 @@ class Macroblock:
             self.luma_i16x16_dc_block = Block(0, self, "Y", "16x16", "DC")
             for i in range(16):
                 self.luma_blocks.append(Block(i, self, "Y", "16x16", "AC"))
-        elif self.pred_mode == 'Pred_L0':
+        else:
             for i in range(16):
                 self.luma_blocks.append(Block(i, self, 'Y', '4x4'))
 
@@ -70,16 +75,19 @@ class Macroblock:
         self.pred_L = array_2d(16,16)
 
     def macroblock_layer(self) :
-        # TODO I_PCM and P macroblock, sub_mb_pred()
+        # TODO I_PCM
         if self.mb_type == 'I_PCM':
             raise NameError('I_PCM not impl')
         else:
             noSubMbPartSizeLessThan8x8Flag = 1
             if self.mb_type != 'I_NxN' and self.pred_mode != 'Intra_16x16' and self.NumMbPart == 4:
-                print('zzzz')
-                self.sub_mb_type()
+                self.sub_mb_pred()
                 for mbPartIdx in range(4):
-                    pass
+                    if self.sub_mb_type[mbPartIdx] != 'B_Direct_8x8':
+                        if self.NumSubMbPart(self.sub_mb_type[mbPartIdx]) > 1:
+                            noSubMbPartSizeLessThan8x8Flag = 0
+                        elif not self.slice.sps.direct_8x8_inference_flag:
+                            noSubMbPartSizeLessThan8x8Flag = 0
             else:
                 if self.slice.pps.transform_8x8_mode_flag and self.mb_type == 'I_NxN':
                     self.transform_size_8x8_flag = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.u(1)
@@ -130,11 +138,11 @@ class Macroblock:
             for mbPartIdx in range(self.NumMbPart):
                 if ( self.slice.num_ref_idx_l0_active_minus1 > 0 or \
                      self.slice.mb_field_decoding_flag != self.slice.field_pic_flag ) and self.pred_mode != 'Pred_L1':
-                    ref_idx_l0 = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.te()
+                    ref_idx_l0 = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.te(self.slice.num_ref_idx_l0_active_minus1)
             for mbPartIdx in range(self.NumMbPart):
                 if ( self.slice.num_ref_idx_l1_active_minus1 > 0 or \
                      self.slice.mb_field_decoding_flag != self.slice.field_pic_flag ) and self.pred_mode != 'Pred_L0':
-                    ref_idx_l1 = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.te()
+                    ref_idx_l1 = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.te(self.slice.num_ref_idx_l1_active_minus1)
             for mbPartIdx in range(self.NumMbPart):
                 if self.pred_mode != 'Pred_L1':
                     for compIdx in range(2):
@@ -166,9 +174,32 @@ class Macroblock:
                         self.mvd_l1"][mbPartIdx][0][compIdx] = self.slice.bits.ae() if self.slice.pps["entropy_coding_mode_flag else self.slice.bits.se()
             '''
 
-    def sub_mb_pred(self, mbPartIdx):
-        # TODO
-        pass
+    def sub_mb_pred(self):
+        self.sub_mb_type = [None] * 4
+        for mbPartIdx in range(4):
+            self.sub_mb_type[mbPartIdx] = sub_mb_type_pslice_table[self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.ue()]
+        for mbPartIdx in range(4):
+            if ( self.slice.num_ref_idx_l0_active_minus1 > 0 or \
+                 self.slice.mb_field_decoding_flag != self.slice.field_pic_flag ) and \
+                 self.mb_type != 'P_8x8ref0' and self.sub_mb_type[mbPartIdx] != 'B_Direct_8x8' and self.SubMbPredMode(self.sub_mb_type[mbPartIdx]) != 'Pred_L1':
+                ref_idx_l0 = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.te(self.slice.num_ref_idx_l0_active_minus1)
+        for mbPartIdx in range(4):
+            if ( self.slice.num_ref_idx_l1_active_minus1 > 0 or \
+                 self.slice.mb_field_decoding_flag != self.slice.field_pic_flag ) and \
+                 self.mb_type != 'P_8x8ref0' and self.sub_mb_type[mbPartIdx] != 'B_Direct_8x8' and self.SubMbPredMode(self.sub_mb_type[mbPartIdx]) != 'Pred_L0':
+                ref_idx_l1 = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.te(self.slice.num_ref_idx_l1_active_minus1)
+        for mbPartIdx in range(4):
+            if self.sub_mb_type[mbPartIdx] != 'B_Direct_8x8' and self.SubMbPredMode(self.sub_mb_type[mbPartIdx]) != 'Pred_L1':
+                for subMbPartIdx in range(self.NumSubMbPart(self.sub_mb_type[mbPartIdx])):
+                    for compIdx in range(2):
+                        mvd_l0 = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.se()
+                        print('sub mvd_0: {}'.format(mvd_l0))
+        for mbPartIdx in range(4):
+            if self.sub_mb_type[mbPartIdx] != 'B_Direct_8x8' and self.SubMbPredMode(self.sub_mb_type[mbPartIdx]) != 'Pred_L0':
+                for subMbPartIdx in range(self.NumSubMbPart(self.sub_mb_type[mbPartIdx])):
+                    for compIdx in range(2):
+                        mvd_l1 = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.se()
+
 
     def residual(self, startIdx, endIdx):
         self.residual_luma(startIdx, endIdx)
@@ -228,18 +259,56 @@ class Macroblock:
             else:
                 raise NameError("Unknown MbPartPredMode")
         elif self.slice.slice_type == 'P':
-            if mb_type_int > 5:
-                #TODO
-                pass
+            if self.mb_type == 'P_Skip':
+                self.NumMbPart = 1
+                self.MbPartWidth = 16
+                self.MbPartHeight = 16
+                return 'Pred_L0'
+
+            if mb_type_int > 4:
+                mb_type_int_minus5 = mb_type_int - 5
+                if mb_type_int_minus5 == 0:
+                    return 'Intra_4x4'
+                elif mb_type_int_minus5 >= 1 and mb_type_int_minus5 <= 24:
+                    self.Intra16x16PredMode = (mb_type_int_minus5 - 1) % 4
+                    self.CodedBlockPatternChroma = ((mb_type_int_minus5 - 1) // 4) % 3
+                    self.CodedBlockPatternLuma = (mb_type_int_minus5 // 13) * 15
+                    return 'Intra_16x16'
+                else:
+                    raise NameError("Unknown MbPartPredMode")
             elif (mb_type_int, n) in [(0,0), (1,0), (2,0), (5,0), (1,1), (2,1)]:
                 self.NumMbPart = [1,2,2,4,4,1][mb_type_int]
                 self.MbPartWidth = [16,16,8,8,8,16][mb_type_int]
                 self.MbPartHeight = [16,8,16,8,8,16][mb_type_int]
                 return "Pred_L0"
+            elif mb_type_int in [3, 4]:
+                self.NumMbPart = 4
+                self.MbPartWidth = 8
+                self.MbPartHeight = 8
+                return 'na'
 
-    def SubMbPredMode(self):
-        # TODO
-        pass
+    def SubMbPredMode(self, sub_mb_type):
+        return 'Pred_L0'
+
+    def NumSubMbPart(self, sub_mb_type):
+        if sub_mb_type == 'P_L0_8x8':
+            return 1
+        elif sub_mb_type == 'P_L0_8x4' or sub_mb_type == 'P_L0_4x8':
+            return 2
+        elif sub_mb_type == 'P_L0_4x4':
+            return 4
+
+    def SubMbPartWidth(self, sub_mb_type):
+        if sub_mb_type == 'P_L0_8x8' or sub_mb_type == 'P_L0_8x4':
+            return 8
+        elif sub_mb_type == 'P_L0_4x8' or sub_mb_type == 'P_L0_4x4':
+            return 4
+
+    def SubMbPartHeight(self, sub_mb_type):
+        if sub_mb_type == 'P_L0_8x8' or sub_mb_type == 'P_L0_4x8':
+            return 8
+        elif sub_mb_type == 'P_L0_8x4' or sub_mb_type == 'P_L0_4x4':
+            return 4
 
     def luma_neighbor_location(self, xN, yN):
         # 6.4.12

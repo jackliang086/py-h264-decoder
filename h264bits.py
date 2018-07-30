@@ -122,8 +122,7 @@ class H264Bits:
         return (-1)**(k+1) * ceil(k/2)
 
     def me(self, mb_pred_mode, chroma_array_type):
-        if mb_pred_mode == 'Pred_L0':
-            mb_pred_mode = 'Inter'
+        mb_pred_mode = mb_pred_mode if 'Intra' in mb_pred_mode else 'Inter'
 
         if chroma_array_type in [1, 2]:
             if mb_pred_mode in ['Intra_8x8', 'Intra_4x4']:
@@ -136,6 +135,13 @@ class H264Bits:
             elif mb_pred_mode == "Inter":
                 table = H264Bits.table9_4b_inter
         return table[self.exp_golomb()]
+
+    def te(self, maximum):
+        if maximum > 1:
+            return self.ue()
+        else:
+            b = self.u(1)
+            return 0 if b == 1 else 1
 
     def ce(self):
         print("ce() not IMPL yet")
