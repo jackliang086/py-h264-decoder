@@ -44,6 +44,8 @@ class Macroblock:
             for i in range(16):
                 self.luma_blocks.append(Block(i, self, "Y", "16x16", "AC"))
         else:
+            self.ref_idx_l0 = [0] * self.NumMbPart
+            self.ref_idx_l1 = [0] * self.NumMbPart
             for i in range(16):
                 self.luma_blocks.append(Block(i, self, 'Y', '4x4'))
 
@@ -135,70 +137,58 @@ class Macroblock:
             if self.slice.sps.ChromaArrayType == 1 or self.slice.sps.ChromaArrayType == 2:
                 self.intra_chroma_pred_mode = self.slice.bits.ue()
         elif self.pred_mode != "Direct":
+            # init mvd
+            self.mvd_l0 = [ [ [0, 0] ] ] * self.NumMbPart
+            self.mvd_l1 = [ [ [0, 0] ] ] * self.NumMbPart
+
             for mbPartIdx in range(self.NumMbPart):
                 if ( self.slice.num_ref_idx_l0_active_minus1 > 0 or \
                      self.slice.mb_field_decoding_flag != self.slice.field_pic_flag ) and self.pred_mode != 'Pred_L1':
-                    ref_idx_l0 = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.te(self.slice.num_ref_idx_l0_active_minus1)
+                    self.ref_idx_l0[mbPartIdx] = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.te(self.slice.num_ref_idx_l0_active_minus1)
             for mbPartIdx in range(self.NumMbPart):
                 if ( self.slice.num_ref_idx_l1_active_minus1 > 0 or \
                      self.slice.mb_field_decoding_flag != self.slice.field_pic_flag ) and self.pred_mode != 'Pred_L0':
-                    ref_idx_l1 = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.te(self.slice.num_ref_idx_l1_active_minus1)
+                    self.ref_idx_l1[mbPartIdx] = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.te(self.slice.num_ref_idx_l1_active_minus1)
             for mbPartIdx in range(self.NumMbPart):
                 if self.pred_mode != 'Pred_L1':
                     for compIdx in range(2):
-                        mvd_l0 = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.se()
-                        print('mvd_0: {}'.format(mvd_l0))
+                        self.mvd_l0[mbPartIdx][0][compIdx] = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.se()
             for mbPartIdx in range(self.NumMbPart):
                 if self.pred_mode != 'Pred_L0':
                     for compIdx in range(2):
-                        mvd_l1 = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.se()
-            '''
-            raise NameError("pred mode direct not impl")
-            for mbPartIdx in range(NumMbPart(mb_type)):
-                if self.num_ref_idx_l0_active_minus1 > 0 or \
-                   self.mb_field_decoding_flag"] != self.params["field_pic_flag and \
-                   self.MbPartPredMode(mb_type, mbPartIdx) != "Pred_L1":
-                    self.ref_idx_l0"][mbPartIdx] = self.slice.bits.ae() if self.slice.pps["entropy_coding_mode_flag else self.slice.bits.te()
-            for mbPartIdx in range(NumMbPart(mb_type)):
-                if self.num_ref_idx_l1_active_minus1 > 0 or \
-                   self.mb_field_decoding_flag"] != self.params["field_pic_flag and \
-                   self.MbPartPredMode(mb_type, mbPartIdx ) != "Pred_L0":
-                    self.ref_idx_l1"][mbPartIdx] =self.slice.bits.ae() if self.slice.pps["entropy_coding_mode_flag else self.slice.bits.te()
-            for mbPartIdx in range(NumMbPart(mb_type)):
-                if self.MbPartPredMode(mb_type, mbPartIdx ) != "Pred_L1":
-                    for compIdx in range(2):
-                        self.mvd_l0"][mbPartIdx][0][compIdx] = self.slice.bits.ae() if self.slice.pps["entropy_coding_mode_flag else self.slice.bits.se()
-            for mbPartIdx in range(NumMbPart(mb_type)):
-                if self.MbPartPredMode(mb_type, mbPartIdx ) != "Pred_L0":
-                    for compIdx in range(2):
-                        self.mvd_l1"][mbPartIdx][0][compIdx] = self.slice.bits.ae() if self.slice.pps["entropy_coding_mode_flag else self.slice.bits.se()
-            '''
+                        self.mvd_l1[mbPartIdx][0][compIdx] = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.se()
 
     def sub_mb_pred(self):
         self.sub_mb_type = [None] * 4
         for mbPartIdx in range(4):
             self.sub_mb_type[mbPartIdx] = sub_mb_type_pslice_table[self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.ue()]
+
+        # init mvd
+        self.mvd_l0 = [None] * 4
+        self.mvd_l1 = [None] * 4
+        for mbPartIdx in range(4):
+            self.mvd_l0[mbPartIdx] = [ [0, 0] ] * self.NumSubMbPart(self.sub_mb_type[mbPartIdx])
+
         for mbPartIdx in range(4):
             if ( self.slice.num_ref_idx_l0_active_minus1 > 0 or \
                  self.slice.mb_field_decoding_flag != self.slice.field_pic_flag ) and \
                  self.mb_type != 'P_8x8ref0' and self.sub_mb_type[mbPartIdx] != 'B_Direct_8x8' and self.SubMbPredMode(self.sub_mb_type[mbPartIdx]) != 'Pred_L1':
-                ref_idx_l0 = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.te(self.slice.num_ref_idx_l0_active_minus1)
+                self.ref_idx_l0[mbPartIdx] = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.te(self.slice.num_ref_idx_l0_active_minus1)
         for mbPartIdx in range(4):
             if ( self.slice.num_ref_idx_l1_active_minus1 > 0 or \
                  self.slice.mb_field_decoding_flag != self.slice.field_pic_flag ) and \
                  self.mb_type != 'P_8x8ref0' and self.sub_mb_type[mbPartIdx] != 'B_Direct_8x8' and self.SubMbPredMode(self.sub_mb_type[mbPartIdx]) != 'Pred_L0':
-                ref_idx_l1 = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.te(self.slice.num_ref_idx_l1_active_minus1)
+                self.ref_idx_l1[mbPartIdx] = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.te(self.slice.num_ref_idx_l1_active_minus1)
         for mbPartIdx in range(4):
             if self.sub_mb_type[mbPartIdx] != 'B_Direct_8x8' and self.SubMbPredMode(self.sub_mb_type[mbPartIdx]) != 'Pred_L1':
                 for subMbPartIdx in range(self.NumSubMbPart(self.sub_mb_type[mbPartIdx])):
                     for compIdx in range(2):
-                        mvd_l0 = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.se()
-                        print('sub mvd_0: {}'.format(mvd_l0))
+                        self.mvd_l0[mbPartIdx][subMbPartIdx][compIdx] = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.se()
         for mbPartIdx in range(4):
             if self.sub_mb_type[mbPartIdx] != 'B_Direct_8x8' and self.SubMbPredMode(self.sub_mb_type[mbPartIdx]) != 'Pred_L0':
                 for subMbPartIdx in range(self.NumSubMbPart(self.sub_mb_type[mbPartIdx])):
                     for compIdx in range(2):
-                        mvd_l1 = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.se()
+                        self.mvd_l1[mbPartIdx][subMbPartIdx][compIdx] = self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.se()
 
 
     def residual(self, startIdx, endIdx):
