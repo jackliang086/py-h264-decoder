@@ -77,3 +77,22 @@ def mat_mult(a, b):
         for j in range(p):
             prod[i][j] = sum([a[i][k] * b[k][j] for k in range(ma)])
     return prod
+
+def median_mv(mv_a, mv_b, mv_c):
+    m_x = get_median([mv_a[0], mv_b[0], mv_c[0]])
+    m_y = get_median([mv_a[1], mv_b[1], mv_c[1]])
+    return [m_x, m_y]
+
+def add_mv(mvd, mvp):
+    mv = []
+    for i in range(len(mvd)):
+        mv.append(mvd[i] + mvp[i])
+    return mv
+
+def is_zero_mv(mv):
+    return True if mv[0] == 0 and mv[1] == 0 else False
+
+def get_median(data):
+    data.sort()
+    half = len(data) // 2
+    return (data[half] + data[~half]) / 2

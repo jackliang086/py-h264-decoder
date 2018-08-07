@@ -312,6 +312,7 @@ class Slice:
                     prevMbSkipped = self.mb_skip_run > 0
                     for i in range(self.mb_skip_run) :
                         self.mbs.append(Macroblock(self, len(self.mbs), pskip=True))
+                        self.mbs[-1].parse()
                         self.CurrMbAddr = self.NextMbAddress( self.CurrMbAddr )
                     if self.mb_skip_run > 0 :
                         moreDataFlag = self.bits.more_rbsp_data( )

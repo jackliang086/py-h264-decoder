@@ -18,6 +18,11 @@ class Block:
         self.slice = mb.slice
         self.bits = self.mb.slice.bits
 
+        self.mv_l0 = [0, 0]
+        self.mv_l1 = [0, 0]
+        self.ref_idx_l0 = 0
+        self.ref_idx_l1 = 0
+
     def all_ac_zeros(self, mbAddr, blkIdx):
         if self.color == "Y":
             CodedBlockPatternLuma = self.slice.mbs[mbAddr].CodedBlockPatternLuma

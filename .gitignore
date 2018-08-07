@@ -92,6 +92,9 @@ ENV/
 # macos
 .DS_Store
 
+# pycharm
+.idea/
+
 # project
 .projectile
 Luma

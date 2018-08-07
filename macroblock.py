@@ -1,6 +1,6 @@
 from block import Block
 from pprint import pprint
-from utilities import array_2d, Clip3
+from utilities import array_2d, Clip3, InverseRasterScan, median_mv, add_mv, is_zero_mv
 
 mbtype_islice_table = ["I_NxN","I_16x16_0_0_0","I_16x16_1_0_0","I_16x16_2_0_0","I_16x16_3_0_0","I_16x16_0_1_0","I_16x16_1_1_0","I_16x16_2_1_0","I_16x16_3_1_0","I_16x16_0_2_0","I_16x16_1_2_0","I_16x16_2_2_0","I_16x16_3_2_0","I_16x16_0_0_1","I_16x16_1_0_1","I_16x16_2_0_1","I_16x16_3_0_1","I_16x16_0_1_1","I_16x16_1_1_1","I_16x16_2_1_1","I_16x16_3_1_1","I_16x16_0_2_1","I_16x16_1_2_1","I_16x16_2_2_1","I_16x16_3_2_1","I_PCM"]
 mbtype_pslice_table = ["P_L0_16x16", "P_L0_L0_16x8", "P_L0_L0_8x16", "P_8x8", "P_8x8ref0", "P_Skip"]
@@ -28,7 +28,6 @@ class Macroblock:
                 else:
                     self.mb_type = mbtype_pslice_table[self.mb_type_int]
             print(str(self.idx) + ' ' + self.mb_type)
-            # TODO the intra macroblock in p slice
         else:
             raise NameError("Unknow MB Type")
         self.pred_mode = self.MbPartPredMode(self.mb_type_int)
@@ -44,8 +43,11 @@ class Macroblock:
             for i in range(16):
                 self.luma_blocks.append(Block(i, self, "Y", "16x16", "AC"))
         else:
-            self.ref_idx_l0 = [0] * self.NumMbPart
-            self.ref_idx_l1 = [0] * self.NumMbPart
+            self.ref_idx_l0 = []
+            self.ref_idx_l1 = []
+            for i in range(self.NumMbPart):
+                self.ref_idx_l0.append(0)
+                self.ref_idx_l1.append(0)
             for i in range(16):
                 self.luma_blocks.append(Block(i, self, 'Y', '4x4'))
 
@@ -65,8 +67,12 @@ class Macroblock:
 
     def parse(self):
         # print("  MacroBlock ", self.addr, " Decoding...")
-        self.init_params()
-        self.macroblock_layer()
+        if self.mb_type != 'P_Skip':
+            self.init_params()
+            self.macroblock_layer()
+
+        if self.slice.slice_type == 'P':
+            self.calculate_mv()
 
     def init_params(self):
         self.transform_size_8x8_flag = 0
@@ -138,8 +144,11 @@ class Macroblock:
                 self.intra_chroma_pred_mode = self.slice.bits.ue()
         elif self.pred_mode != "Direct":
             # init mvd
-            self.mvd_l0 = [ [ [0, 0] ] ] * self.NumMbPart
-            self.mvd_l1 = [ [ [0, 0] ] ] * self.NumMbPart
+            self.mvd_l0 = []
+            self.mvd_l1 = []
+            for mbPartIdx in range(self.NumMbPart):
+                self.mvd_l0.append([[0, 0]])
+                self.mvd_l1.append([[0, 0]])
 
             for mbPartIdx in range(self.NumMbPart):
                 if ( self.slice.num_ref_idx_l0_active_minus1 > 0 or \
@@ -164,10 +173,12 @@ class Macroblock:
             self.sub_mb_type[mbPartIdx] = sub_mb_type_pslice_table[self.slice.bits.ae() if self.slice.pps.entropy_coding_mode_flag else self.slice.bits.ue()]
 
         # init mvd
-        self.mvd_l0 = [None] * 4
-        self.mvd_l1 = [None] * 4
+        self.mvd_l0 = [None for n in range(4)]
+        self.mvd_l1 = [None for n in range(4)]
+        self.mvp_l0 = [None for n in range(4)]
         for mbPartIdx in range(4):
-            self.mvd_l0[mbPartIdx] = [ [0, 0] ] * self.NumSubMbPart(self.sub_mb_type[mbPartIdx])
+            self.mvd_l0[mbPartIdx] = [ [0, 0] for n in range(self.NumSubMbPart(self.sub_mb_type[mbPartIdx]))]
+            self.mvp_l0[mbPartIdx] = [ [0, 0] for n in range(self.NumSubMbPart(self.sub_mb_type[mbPartIdx]))]
 
         for mbPartIdx in range(4):
             if ( self.slice.num_ref_idx_l0_active_minus1 > 0 or \
@@ -300,6 +311,221 @@ class Macroblock:
         elif sub_mb_type == 'P_L0_8x4' or sub_mb_type == 'P_L0_4x4':
             return 4
 
+    def is_intra(self):
+        return True if 'Intra' in self.pred_mode else False
+
+    def calculate_mv(self):
+        if self.is_intra():
+            return
+
+        if self.mb_type == 'P_Skip':
+            self.mvd_l0 = [[[0, 0]]]
+
+
+        if self.NumMbPart == 2:
+            for mbPartIdx in range(2):
+                (neighbor_a, neighbor_b, neighbor_c) = self.get_mvp_neighbor(mbPartIdx, 0)
+                ref_idx = self.ref_idx_l0[mbPartIdx]
+                mv_pred = self.get_mvp_normal(ref_idx, neighbor_a, neighbor_b, neighbor_c, mbPartIdx)
+                mv = add_mv(self.mvd_l0[mbPartIdx][0], mv_pred)
+                if self.MbPartWidth == 16:
+                    # width = 16 height = 8
+                    self.set_mv(0, self.MbPartHeight * mbPartIdx, self.MbPartWidth, self.MbPartHeight, mv, ref_idx)
+                else:
+                    # width = 8 height = 16
+                    self.set_mv(self.MbPartWidth * mbPartIdx, 0, self.MbPartWidth, self.MbPartHeight, mv, ref_idx)
+                print('mbIdx:{} mbPartIdx:{} mvd:{} mv:{}'.format(self.idx, mbPartIdx, self.mvd_l0[mbPartIdx][0], mv))
+        else:
+            if self.NumMbPart == 1:
+                (neighbor_a, neighbor_b, neighbor_c) = self.get_mvp_neighbor(0, 0)
+
+                zero_mv_a = True if neighbor_a == None or (neighbor_a.ref_idx_l0 == 0 and is_zero_mv(neighbor_a.mv_l0)) else False
+                zero_mv_b = True if neighbor_b == None or (neighbor_b.ref_idx_l0 == 0 and is_zero_mv(neighbor_b.mv_l0)) else False
+                if self.mb_type == 'P_Skip' and ( zero_mv_a or zero_mv_b ):
+                    # 8.4.1.1 Derivation process for luma motion vectors for skipped macroblocks in P and SP slices
+                    self.set_mv(0, 0, self.MbPartWidth, self.MbPartHeight, [0, 0], 0)
+                    print('skip mbIdx:{} mvd:{} mv:{}'.format(self.idx, self.mvd_l0[0][0], [0, 0]))
+                    return
+
+                ref_idx = self.ref_idx_l0[0]
+                mv_pred = self.get_mvp_normal(ref_idx, neighbor_a, neighbor_b, neighbor_c)
+                mv = add_mv(self.mvd_l0[0][0], mv_pred)
+                self.set_mv(0, 0, self.MbPartWidth, self.MbPartHeight, mv, ref_idx)
+                print('mbIdx:{} mvd:{} mv:{}'.format(self.idx, self.mvd_l0[0][0], mv))
+            else:
+                # P_8x8 P_8x8ref0
+                for mbPartIdx in range(4):
+                    s_m_t = self.sub_mb_type[mbPartIdx]
+                    for subMbPartIdx in range(self.NumSubMbPart(s_m_t)):
+                        (neighbor_a, neighbor_b, neighbor_c) = self.get_mvp_neighbor(mbPartIdx, subMbPartIdx)
+                        ref_idx = self.ref_idx_l0[mbPartIdx]
+                        mv_pred = self.get_mvp_normal(ref_idx, neighbor_a, neighbor_b, neighbor_c)
+                        mv = add_mv(self.mvd_l0[mbPartIdx][subMbPartIdx], mv_pred)
+
+                        x = InverseRasterScan(mbPartIdx, self.MbPartWidth, self.MbPartHeight, 16, 0)
+                        y = InverseRasterScan(mbPartIdx, self.MbPartWidth, self.MbPartHeight, 16, 1)
+                        xS = InverseRasterScan(subMbPartIdx, self.SubMbPartWidth(s_m_t),
+                                               self.SubMbPartHeight(s_m_t), 8, 0)
+                        yS = InverseRasterScan(subMbPartIdx, self.SubMbPartWidth(s_m_t),
+                                               self.SubMbPartHeight(s_m_t), 8, 1)
+                        s_x = x + xS
+                        s_y = y + yS
+                        self.set_mv(s_x, s_y, self.SubMbPartWidth(s_m_t), self.SubMbPartHeight(s_m_t), mv, ref_idx)
+                        print('mbIdx:{} mbPartIdx{} subMbPartIdx{} mvd:{} mv:{}'.format(self.idx, mbPartIdx, subMbPartIdx, self.mvd_l0[0][0], mv))
+
+
+
+    def set_mv(self, x, y, width, height, mv_l0, ref_idx_l0):
+        for h in range(0, height, 4):
+            for w in range(0, width, 4):
+                xW = x + w
+                yW = y + h
+                luma4x4BlkIdxTmp = int(8 * ( yW // 8 ) + 4 * ( xW // 8 ) + 2 * ( ( yW % 8 ) // 4 ) + ( ( xW % 8 ) // 4 ))
+                blk = self.luma_blocks[luma4x4BlkIdxTmp]
+                blk.mv_l0 = mv_l0
+                blk.ref_idx_l0 = ref_idx_l0
+
+    def get_mvp_normal(self, ref_idx, neighborA, neighborB, neighborC, partIdx=-1):
+        mv_pred_type = 'M'
+
+        ref_a = -1 if neighborA == None else neighborA.ref_idx_l0
+        ref_b = -1 if neighborB == None else neighborB.ref_idx_l0
+        ref_c = -1 if neighborC == None else neighborC.ref_idx_l0
+
+        # Prediction if only one of the neighbors uses the reference frame we are checking
+        if ref_a == ref_idx and ref_b != ref_idx and ref_c != ref_idx:
+            mv_pred_type = 'L'
+        elif ref_a != ref_idx and ref_b == ref_idx and ref_c != ref_idx:
+            mv_pred_type = 'U'
+        elif ref_a != ref_idx and ref_b != ref_idx and ref_c == ref_idx:
+            mv_pred_type = 'UR'
+
+        # Directional predictions
+        if self.MbPartWidth == 16 and self.MbPartHeight == 8:
+            if partIdx == 0:
+                if ref_idx == ref_b:
+                    mv_pred_type = 'U'
+            elif partIdx == 1:
+                if ref_idx == ref_a:
+                    mv_pred_type = 'L'
+        elif self.MbPartWidth == 8 and self.MbPartHeight == 16:
+            if partIdx == 0:
+                if ref_idx == ref_a:
+                    mv_pred_type = 'L'
+            elif partIdx == 1:
+                if ref_idx == ref_c:
+                    mv_pred_type = 'UR'
+
+        pmv = [0, 0]
+        if mv_pred_type == 'M':
+            if not (neighborB != None or neighborC != None):
+                if neighborA != None:
+                    pmv = neighborA.mv_l0
+            else:
+                mv_a = [0, 0] if neighborA == None else neighborA.mv_l0
+                mv_b = [0, 0] if neighborB == None else neighborB.mv_l0
+                mv_c = [0, 0] if neighborC == None else neighborC.mv_l0
+
+                pmv = median_mv(mv_a ,mv_b, mv_c)
+        elif mv_pred_type == 'L':
+            if neighborA != None:
+                pmv = neighborA.mv_l0
+        elif mv_pred_type == 'U':
+            if neighborB != None:
+                pmv = neighborB.mv_l0
+        elif mv_pred_type == 'UR':
+            if neighborC != None:
+                pmv = neighborC.mv_l0
+
+        return pmv
+
+    def get_mvp_neighbor_2parts(self):
+        neighbor_a = self.luma_neighbor_block_location(-1, 0)
+        neighbor_b = self.luma_neighbor_block_location(0, -1)
+        neighbor_c = self.luma_neighbor_block_location(16, -1)
+
+        if neighbor_c == None:
+            neighbor_d = self.luma_neighbor_block_location(-1, -1)
+            neighbor_c = neighbor_d
+
+        return (neighbor_a, neighbor_b, neighbor_c)
+
+    def get_mvp_neighbor(self, mbPartIdx, subMbPartIdx):
+        neighbor_a = self.luma_neighbor_partition_location(mbPartIdx, subMbPartIdx, 'A')
+        neighbor_b = self.luma_neighbor_partition_location(mbPartIdx, subMbPartIdx, 'B')
+        neighbor_c = self.luma_neighbor_partition_location(mbPartIdx, subMbPartIdx, 'C')
+
+        if neighbor_c == None:
+            neighbor_d = self.luma_neighbor_partition_location(mbPartIdx, subMbPartIdx, 'D')
+            neighbor_c = neighbor_d
+
+        return (neighbor_a, neighbor_b, neighbor_c)
+
+    def luma_neighbor_partition_location(self, mbPartIdx, subMbPartIdx, direct):
+        # 6.4.11.7
+        x = InverseRasterScan( mbPartIdx, self.MbPartWidth, self.MbPartHeight, 16, 0 )
+        y = InverseRasterScan( mbPartIdx, self.MbPartWidth, self.MbPartHeight, 16, 1 )
+
+        if self.mb_type == 'P_8x8' or self.mb_type == 'P_8x8ref0' or self.mb_type == 'B_8x8':
+            xS = InverseRasterScan( subMbPartIdx, self.SubMbPartWidth( self.sub_mb_type[ mbPartIdx ] ), self.SubMbPartHeight( self.sub_mb_type[ mbPartIdx ] ), 8, 0 )
+            yS = InverseRasterScan( subMbPartIdx, self.SubMbPartWidth( self.sub_mb_type[ mbPartIdx ] ), self.SubMbPartHeight( self.sub_mb_type[ mbPartIdx ] ), 8, 1 )
+        else:
+            xS = 0
+            yS = 0
+
+        if self.mb_type == 'P_Skip':
+            predPartWidth = 16
+        elif self.mb_type == 'P_8x8' or self.mb_type == 'P_8x8ref0':
+            predPartWidth = self.SubMbPartWidth(self.sub_mb_type[mbPartIdx])
+        else:
+            predPartWidth = self.MbPartWidth
+
+        shiftTable = {'A':(-1,0), 'B':(0,-1), 'C':(predPartWidth,-1), 'D':(-1,-1)}
+        (xD, yD) = shiftTable[direct]
+
+        xN = x + xS + xD
+        yN = y + yS + yD
+
+        (mbAddrTmp, xW, yW) = self.luma_neighbor_location(xN, yN)
+        if mbAddrTmp == None:
+            luma4x4BlkIdxTmp = None
+        else:
+            luma4x4BlkIdxTmp = int(8 * ( yW // 8 ) + 4 * ( xW // 8 ) + 2 * ( ( yW % 8 ) // 4 ) + ( ( xW % 8 ) // 4 ))
+        # print("      Find neighbor:", direct)
+        # print("      xD, yD:", xD, yD)
+        # print("      x, y:", x, y)
+        # print("      xN, yN:", xN, yN)
+        # print("      xW, yW:", xW, yW)
+        # print("      mbAddrN:", mbAddrTmp)
+        # print("      lumaIdx:", luma4x4BlkIdxTmp)
+        # print("  -> MB:", mbAddrTmp, "BLK:", luma4x4BlkIdxTmp)
+        if mbAddrTmp == None:
+            return None
+        else:
+            mb = self.slice.mbs[mbAddrTmp]
+            blk = mb.luma_blocks[luma4x4BlkIdxTmp]
+            if mb.is_intra():
+                blk.ref_idx_l0 = -1
+                blk.mv_l0 = [0, 0]
+            return blk
+
+    def luma_neighbor_block_location(self, xN, yN):
+        (mbAddrTmp, xW, yW) = self.luma_neighbor_location(xN, yN)
+        if mbAddrTmp == None:
+            luma4x4BlkIdxTmp = None
+        else:
+            luma4x4BlkIdxTmp = int(8 * ( yW // 8 ) + 4 * ( xW // 8 ) + 2 * ( ( yW % 8 ) // 4 ) + ( ( xW % 8 ) // 4 ))
+
+        if mbAddrTmp == None:
+            return None
+        else:
+            mb = self.slice.mbs[mbAddrTmp]
+            blk = mb.luma_blocks[luma4x4BlkIdxTmp]
+            if mb.is_intra():
+                blk.ref_idx_l0 = -1
+                blk.mv_l0 = [0, 0]
+            return blk
+
     def luma_neighbor_location(self, xN, yN):
         # 6.4.12
         maxW = 16
@@ -319,7 +545,7 @@ class Macroblock:
                 mbAddrTmp = self.idx
             elif tmp == "C":
                 mbAddrTmp = self.idx - self.slice.PicWidthInMbs + 1
-                if mbAddrTmp < 0 or mbAddrTmp > self.idx or self.idx+1 % self.slice.PicWidthInMbs == 0:
+                if mbAddrTmp < 0 or mbAddrTmp > self.idx or ( self.idx + 1 ) % self.slice.PicWidthInMbs == 0:
                     mbAddrTmp = None
             elif tmp == "D":
                 mbAddrTmp = self.idx - self.slice.PicWidthInMbs - 1
