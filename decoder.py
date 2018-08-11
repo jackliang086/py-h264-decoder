@@ -4,6 +4,7 @@ from nalsps import SPS
 from nalpps import PPS
 from nalsei import SEI
 from nalslice import Slice
+from deblocking import deblock_frame
 from pprint import pprint
 from copy import copy
 import utilities
@@ -35,6 +36,7 @@ def decode_slice(slice):
         import intra_pred
         intra_pred.luma_pred(mb)
         intra_pred.chroma_pred(mb)
+    deblock_frame(slice)
     utilities.pic_paint(slice.S_prime_L, "Luma")
     utilities.pic_paint(slice.S_prime_Cb, "Cb")
     utilities.pic_paint(slice.S_prime_Cr, "Cr")
@@ -62,7 +64,8 @@ if __name__ == '__main__':
             dump_params(pps, fname)
         elif params["nal_unit_type"] in [1, 5]: # Slice
             slice = Slice(nb, sps = sps, ppss = ppss, params = params)
-            # decode_slice(slice)
+            decode_slice(slice)
+            break
             slices.append(slice)
             # dump_mbs(slice, "slice_" + str(len(slices)) + "_mb.json")
             # fname = "slice_" + str(len(slices)) + ".json"

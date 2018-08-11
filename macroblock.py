@@ -108,12 +108,15 @@ class Macroblock:
                self.pred_mode == 'Intra_16x16' :
                 self.mb_qp_delta = self.slice.bits.se()
 
-                SliceQP_Y = 26 + self.slice.pps.pic_init_qp_minus26 + self.slice.slice_qp_delta
-                QP_YPREV = SliceQP_Y
+                if self.idx == 0:
+                    SliceQP_Y = 26 + self.slice.pps.pic_init_qp_minus26 + self.slice.slice_qp_delta
+                    QP_YPREV = SliceQP_Y
+                else:
+                    QP_YPREV = self.slice.mbs[self.idx - 1].QP_Y
                 QpBdOffset_Y = self.slice.sps.QpBdOffset_Y
                 self.QP_Y = ( ( QP_YPREV + self.mb_qp_delta + 52 + 2 * QpBdOffset_Y ) % (52 + QpBdOffset_Y)) - QpBdOffset_Y
                 self.QP_prime_Y = self.QP_Y + QpBdOffset_Y
-                if self.slice.sps.qpprime_y_zero_transform_bypass_flag == 1 and QP_prime_Y == 0:
+                if self.slice.sps.qpprime_y_zero_transform_bypass_flag == 1 and self.QP_prime_Y == 0:
                     self.TransformBypassModeFlag = 1
                 else:
                     self.TransformBypassModeFlag = 0
@@ -577,7 +580,7 @@ class Macroblock:
                 mbAddrTmp = self.idx
             elif tmp == "C":
                 mbAddrTmp = self.idx - self.slice.PicWidthInMbs + 1
-                if mbAddrTmp < 0 or mbAddrTmp > self.idx or self.idx+1 % self.slice.PicWidthInMbs == 0:
+                if mbAddrTmp < 0 or mbAddrTmp > self.idx or (self.idx + 1) % self.slice.PicWidthInMbs == 0:
                     mbAddrTmp = None
             elif tmp == "D":
                 mbAddrTmp = self.idx - self.slice.PicWidthInMbs - 1

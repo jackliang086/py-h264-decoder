@@ -29,6 +29,11 @@ def get_cord_of_mb(mbAddr, MbaffFrameFlag, PicWidthInSamples_L):
     else:
         raise NameError("MbaffFrameFlag == 1")
 
+def get_cord_of_mb_chroma(mbAddr, PicWidth):
+    x = InverseRasterScan(mbAddr, 8, 8, PicWidth, 0)
+    y = InverseRasterScan(mbAddr, 8, 8, PicWidth, 1)
+    return (x, y)
+
 # 6.4.3 Inverse 4x4 luma block scanning process
 def get_cord_of_luma4x4(luma4x4BlkIdx):
     x = InverseRasterScan( luma4x4BlkIdx // 4, 8, 8, 16, 0 ) + InverseRasterScan( luma4x4BlkIdx % 4, 4, 4, 8, 0 )
@@ -92,7 +97,17 @@ def add_mv(mvd, mvp):
 def is_zero_mv(mv):
     return True if mv[0] == 0 and mv[1] == 0 else False
 
+def compare_mvs(mv1, mv2):
+    return abs(mv1[0] - mv2[0]) >= 4 or abs(mv1[1] - mv2[1]) >= 4
+
 def get_median(data):
     data.sort()
     half = len(data) // 2
     return (data[half] + data[~half]) / 2
+
+class Pixel:
+
+    def __init__(self, x, y, v):
+        self.x = x
+        self.y = y
+        self.v = v
