@@ -330,7 +330,7 @@ class DeblockStripeY:
             x = xS + (edge << 2)
             y = yS + pos
             for i in range(4):
-                self.p[i] = Pixel(x - 1 - i, y, self.picY[x - 1 + i][y])
+                self.p[i] = Pixel(x - 1 - i, y, self.picY[x - 1 - i][y])
                 self.q[i] = Pixel(x + i, y, self.picY[x + i][y])
         else:
             x = xS + pos
@@ -362,7 +362,7 @@ class DeblockStripeC:
             x = xS + (edge << 2)
             y = yS + pos
             for i in range(2):
-                self.p[i] = Pixel(x - 1 - i, y, self.picC[x - 1 + i][y])
+                self.p[i] = Pixel(x - 1 - i, y, self.picC[x - 1 - i][y])
                 self.q[i] = Pixel(x + i, y, self.picC[x + i][y])
         else:
             x = xS + pos
