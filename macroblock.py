@@ -67,9 +67,12 @@ class Macroblock:
 
     def parse(self):
         # print("  MacroBlock ", self.addr, " Decoding...")
+        self.init_params()
         if self.mb_type != 'P_Skip':
-            self.init_params()
             self.macroblock_layer()
+
+            if self.CodedBlockPatternLuma == 0 and self.CodedBlockPatternChroma == 0:
+                self.init_qp()
 
         if self.slice.slice_type == 'P':
             self.calculate_mv()
@@ -81,6 +84,31 @@ class Macroblock:
         self.rem_intra4x4_pred_mode = [None]*16
         self.rem_intra8x8_pred_mode = [None]*16
         self.pred_L = array_2d(16,16)
+
+        if self.mb_type == 'P_Skip':
+            self.init_qp()
+
+    def init_qp(self):
+        self.mb_qp_delta = 0
+        if self.idx == 0:
+            SliceQP_Y = 26 + self.slice.pps.pic_init_qp_minus26 + self.slice.slice_qp_delta
+            QP_YPREV = SliceQP_Y
+        else:
+            QP_YPREV = self.slice.mbs[self.idx - 1].QP_Y
+        QpBdOffset_Y = self.slice.sps.QpBdOffset_Y
+        self.QP_Y = ((QP_YPREV + self.mb_qp_delta + 52 + 2 * QpBdOffset_Y) % (52 + QpBdOffset_Y)) - QpBdOffset_Y
+        self.QP_prime_Y = self.QP_Y + QpBdOffset_Y
+        if self.slice.sps.qpprime_y_zero_transform_bypass_flag == 1 and self.QP_prime_Y == 0:
+            self.TransformBypassModeFlag = 1
+        else:
+            self.TransformBypassModeFlag = 0
+
+        table_8_15 = [29, 30, 31, 32, 32, 33, 34, 34, 35, 35, 36, 36, 37, 37, 37, 38, 38, 38, 39, 39, 39, 39]
+        # Cb
+        qP_Offset = self.slice.pps.chroma_qp_index_offset
+        qP_I = Clip3(-self.slice.sps.QpBdOffset_C, 51, self.QP_Y + qP_Offset)
+        self.QP_C = qP_I if qP_I < 30 else table_8_15[qP_I - 30]
+        self.QP_prime_C = self.QP_C + self.slice.sps.QpBdOffset_C
 
     def macroblock_layer(self) :
         # TODO I_PCM

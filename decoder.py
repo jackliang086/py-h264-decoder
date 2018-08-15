@@ -5,11 +5,25 @@ from nalpps import PPS
 from nalsei import SEI
 from nalslice import Slice
 from deblocking import deblock_frame
+from dpb import DPB
 from pprint import pprint
 from copy import copy
 import utilities
 import json
 
+class VideoParameters:
+
+    def __init__(self):
+        self.active_sps = None
+        self.active_pps = None
+
+        self.last_has_mmco_5 = 0
+
+        self.PreviousFrameNum = 0
+        self.PreviousFrameNumOffset = 0
+        self.FrameNumOffset = 0
+
+        self.max_frame_num = 0
 
 def dump_params(d, filename):
     tmp = copy(d.__dict__)
@@ -31,12 +45,13 @@ def dump_mbs(slice, filename):
     with open(filename, 'w') as outfile:
         json.dump(mbs_coeffs, outfile)
 
-def decode_slice(slice):
+def decode_slice(slice, dpb):
     for mb in slice.mbs:
         import intra_pred
         intra_pred.luma_pred(mb)
         intra_pred.chroma_pred(mb)
     deblock_frame(slice)
+    dpb.store_pic_in_dpb(slice)
     utilities.pic_paint(slice.S_prime_L, "Luma")
     utilities.pic_paint(slice.S_prime_Cb, "Cb")
     utilities.pic_paint(slice.S_prime_Cr, "Cr")
@@ -47,6 +62,8 @@ if __name__ == '__main__':
     sps = None
     ppss = []
     slices = []
+    vps = VideoParameters()
+    dpb = DPB(vps)
     for nalu_ba in nalus_ba:
         nalu_ba.replace('0x000003', '0x0000', bytealigned=True)
         nalu_bs = BitStream(nalu_ba)
@@ -63,8 +80,12 @@ if __name__ == '__main__':
             fname = "pps_" + str(len(ppss)) + ".json"
             dump_params(pps, fname)
         elif params["nal_unit_type"] in [1, 5]: # Slice
-            slice = Slice(nb, sps = sps, ppss = ppss, params = params)
-            decode_slice(slice)
+            slice = Slice(nb, sps = sps, ppss = ppss, params = params, vps = vps)
+
+            dpb.init_pic_list(slice)
+            dpb.ref_pic_list_reordering(slice)
+
+            decode_slice(slice, dpb)
             break
             slices.append(slice)
             # dump_mbs(slice, "slice_" + str(len(slices)) + "_mb.json")

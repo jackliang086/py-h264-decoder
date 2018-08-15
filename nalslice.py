@@ -14,7 +14,7 @@ class Slice:
         while not self.bits.byte_aligned():
             assert self.bits.f(1) == 0
 
-    def __init__(self, bits, sps, ppss, params):
+    def __init__(self, bits, sps, ppss, params, vps):
         self.bits = bits
         self.sps = sps
         self.pps_list = ppss
@@ -22,6 +22,10 @@ class Slice:
             self.__dict__[k] = params[k]
         self.var = {}
         self.mbs = []
+
+        self.vps = vps
+        self.vps.active_sps = sps
+
         self.parse()
 
     def parse(self):
@@ -46,6 +50,7 @@ class Slice:
         self.slice_type = NalUnit.slice_types[self.slice_type_int]
         self.pic_parameter_set_id = self.bits.ue()
         self.pps = self.pps_list[self.pic_parameter_set_id]
+        self.vps.active_pps = self.pps
         if self.sps.separate_colour_plane_flag == 1 :
             self.colour_plane_id = self.bits.u(2)
         self.frame_num = self.bits.u(self.sps.log2_max_frame_num_minus4 + 4)
@@ -133,6 +138,40 @@ class Slice:
         self.FilterOffsetB = self.slice_beta_offset_div2 << 1
         self.mb_field_decoding_flag = 0
         self.num_ref_idx_l1_active_minus1 = 0 # this project not support b slice
+
+        self.decode_poc()
+
+    def decode_poc(self):
+        if self.sps.pic_order_cnt_type == 0:
+            MaxPicOrderCntLsb = 1 << (self.sps.log2_max_pic_order_cnt_lsb_minus4 + 4)
+            # TODO
+        elif self.sps.pic_order_cnt_type == 1:
+            # TODO
+            pass
+        elif self.sps.pic_order_cnt_type == 2:
+            self.vps.max_frame_num = 1 << (self.sps.log2_max_frame_num_minus4 + 4)
+            if self.IdrPicFlag:
+                self.vps.FrameNumOffset = 0
+                self.ThisPoc = 0
+            else:
+                if self.vps.last_has_mmco_5:
+                    self.vps.PreviousFrameNum = 0
+                    self.vps.PreviousFrameNumOffset = 0
+                if self.frame_num < self.vps.PreviousFrameNum:
+                    self.vps.FrameNumOffset = self.vps.PreviousFrameNumOffset + self.vps.max_frame_num
+                else:
+                    self.vps.FrameNumOffset = self.vps.PreviousFrameNumOffset
+                self.AbsFrameNum = self.vps.FrameNumOffset + self.frame_num
+                if self.nal_ref_idc == 0:
+                    self.ThisPoc = 2 * self.AbsFrameNum - 1
+                else:
+                    self.ThisPoc = 2 * self.AbsFrameNum
+
+                self.framepoc = self.ThisPoc
+
+            self.vps.PreviousFrameNum = self.frame_num
+            self.vps.PreviousFrameNumOffset = self.vps.FrameNumOffset
+
 
     def ref_pic_list_mvc_modification(self):
         print("ref_pic_list_mvc_modification NOT IMPL")
