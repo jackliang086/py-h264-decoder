@@ -6,6 +6,7 @@ from nalsei import SEI
 from nalslice import Slice
 from deblocking import deblock_frame
 from dpb import DPB
+from yuvviewer import output_slice_2_png, make_output_folder
 from pprint import pprint
 from copy import copy
 import utilities
@@ -57,12 +58,17 @@ def decode_slice(slice, dpb):
 
     deblock_frame(slice)
     dpb.store_pic_in_dpb(slice)
-    if slice.slice_type == 'P':
-        utilities.pic_paint(slice.S_prime_L, "Luma")
-        utilities.pic_paint(slice.S_prime_Cb, "Cb")
-        utilities.pic_paint(slice.S_prime_Cr, "Cr")
+
+    output_slice_2_png(slice)
+
+    # utilities.pic_paint(slice.S_prime_L, "Luma")
+    # utilities.pic_paint(slice.S_prime_Cb, "Cb")
+    # utilities.pic_paint(slice.S_prime_Cr, "Cr")
 
 if __name__ == '__main__':
+
+    make_output_folder()
+
     input_file = open("baseline.264", "rb")
     nalus_ba = list(BitArray(input_file).split('0x000001', bytealigned=True))[1:]
     sps = None
@@ -92,8 +98,8 @@ if __name__ == '__main__':
             dpb.ref_pic_list_reordering(slice)
 
             decode_slice(slice, dpb)
-            if slice.slice_type == 'P':
-                break
+
+            print('{} frame, POC: {}'.format(slice.slice_type, slice.ThisPoc))
 
             #slices.append(slice)
             # dump_mbs(slice, "slice_" + str(len(slices)) + "_mb.json")

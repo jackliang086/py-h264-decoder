@@ -27,7 +27,7 @@ class Macroblock:
                     self.mb_type = mbtype_islice_table[self.mb_type_int - 5]
                 else:
                     self.mb_type = mbtype_pslice_table[self.mb_type_int]
-            print(str(self.idx) + ' ' + self.mb_type)
+            # print(str(self.idx) + ' ' + self.mb_type)
         else:
             raise NameError("Unknow MB Type")
         self.pred_mode = self.MbPartPredMode(self.mb_type_int)
