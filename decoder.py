@@ -48,13 +48,19 @@ def dump_mbs(slice, filename):
 def decode_slice(slice, dpb):
     for mb in slice.mbs:
         import intra_pred
-        intra_pred.luma_pred(mb)
-        intra_pred.chroma_pred(mb)
+        from  inter_pred import inter_pred
+        if mb.is_intra():
+            intra_pred.luma_pred(mb)
+            intra_pred.chroma_pred(mb)
+        else:
+            inter_pred(mb, dpb)
+
     deblock_frame(slice)
     dpb.store_pic_in_dpb(slice)
-    utilities.pic_paint(slice.S_prime_L, "Luma")
-    utilities.pic_paint(slice.S_prime_Cb, "Cb")
-    utilities.pic_paint(slice.S_prime_Cr, "Cr")
+    if slice.slice_type == 'P':
+        utilities.pic_paint(slice.S_prime_L, "Luma")
+        utilities.pic_paint(slice.S_prime_Cb, "Cb")
+        utilities.pic_paint(slice.S_prime_Cr, "Cr")
 
 if __name__ == '__main__':
     input_file = open("baseline.264", "rb")
@@ -86,8 +92,10 @@ if __name__ == '__main__':
             dpb.ref_pic_list_reordering(slice)
 
             decode_slice(slice, dpb)
-            break
-            slices.append(slice)
+            if slice.slice_type == 'P':
+                break
+
+            #slices.append(slice)
             # dump_mbs(slice, "slice_" + str(len(slices)) + "_mb.json")
             # fname = "slice_" + str(len(slices)) + ".json"
             # dump_params(slice, fname)

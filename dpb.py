@@ -18,7 +18,7 @@ class DPB:
     def init_pic_list(self, slice):
         # 8.2.4.2
         for f in self.refFrameList0ShortTerm:
-            if f > slice.frame_num:
+            if f.FrameNum > slice.frame_num:
                 f.FrameNumWrap = f.FrameNum - self.vps.max_frame_num
             else:
                 f.FrameNumWrap = f.FrameNum
@@ -45,7 +45,7 @@ class DPB:
 
     def ref_pic_list_reordering(self, slice):
         # 8.2.4.3
-        if slice.slice_type == 'P' and slice.ref_pic_list_reordering_flag_l0 == 1:
+        if slice.slice_type == 'P' and slice.ref_pic_list_modification_flag_l0 == 1:
             # TODO
             pass
 
@@ -115,4 +115,4 @@ class FrameStore:
 
         self.IdrPicFlag = slice.IdrPicFlag
         self.adaptive_ref_pic_marking_mode_flag = 0 if slice.IdrPicFlag else slice.adaptive_ref_pic_marking_mode_flag
-        self.long_term_reference_flag = slice.long_term_reference_flag
+        self.long_term_reference_flag = slice.long_term_reference_flag if slice.IdrPicFlag else 0

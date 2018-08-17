@@ -91,7 +91,7 @@ def median_mv(mv_a, mv_b, mv_c):
 def add_mv(mvd, mvp):
     mv = []
     for i in range(len(mvd)):
-        mv.append(mvd[i] + mvp[i])
+        mv.append(int(mvd[i] + mvp[i]))
     return mv
 
 def is_zero_mv(mv):

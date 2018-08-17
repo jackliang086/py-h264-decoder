@@ -71,8 +71,9 @@ class Macroblock:
         if self.mb_type != 'P_Skip':
             self.macroblock_layer()
 
-            if self.CodedBlockPatternLuma == 0 and self.CodedBlockPatternChroma == 0:
+            if self.CodedBlockPatternLuma == 0 and self.CodedBlockPatternChroma == 0 and self.pred_mode != 'Intra_16x16':
                 self.init_qp()
+                self.init_blks()
 
         if self.slice.slice_type == 'P':
             self.calculate_mv()
@@ -86,7 +87,10 @@ class Macroblock:
         self.pred_L = array_2d(16,16)
 
         if self.mb_type == 'P_Skip':
+            self.CodedBlockPatternLuma = 0
+            self.CodedBlockPatternChroma = 0
             self.init_qp()
+            self.init_blks()
 
     def init_qp(self):
         self.mb_qp_delta = 0
@@ -109,6 +113,19 @@ class Macroblock:
         qP_I = Clip3(-self.slice.sps.QpBdOffset_C, 51, self.QP_Y + qP_Offset)
         self.QP_C = qP_I if qP_I < 30 else table_8_15[qP_I - 30]
         self.QP_prime_C = self.QP_C + self.slice.sps.QpBdOffset_C
+
+    def init_blks(self):
+        for blk in self.luma_blocks:
+            blk.coeffLevel = [0] * 16
+
+        for iCbCr in range(2):
+            self.chroma_dc_blocks[iCbCr].coeffLevel = [0] * 4
+
+        for iCbCr in range(2):
+            for i8x8 in range(1):
+                for i4x4 in range(4):
+                    self.chroma_ac_blocks[iCbCr][i8x8 * 4 + i4x4].coeffLevel = [0] * 16
+
 
     def macroblock_layer(self) :
         # TODO I_PCM
@@ -352,6 +369,14 @@ class Macroblock:
         if self.mb_type == 'P_Skip':
             self.mvd_l0 = [[[0, 0]]]
 
+        if self.NumMbPart != 4:
+            self.mv_l0 = []
+            for mbPartIdx in range(self.NumMbPart):
+                self.mv_l0.append([[0, 0]])
+        else:
+            self.mv_l0 = [None for n in range(4)]
+            for mbPartIdx in range(4):
+                self.mv_l0[mbPartIdx] = [[0, 0] for n in range(self.NumSubMbPart(self.sub_mb_type[mbPartIdx]))]
 
         if self.NumMbPart == 2:
             for mbPartIdx in range(2):
@@ -359,13 +384,14 @@ class Macroblock:
                 ref_idx = self.ref_idx_l0[mbPartIdx]
                 mv_pred = self.get_mvp_normal(ref_idx, neighbor_a, neighbor_b, neighbor_c, mbPartIdx)
                 mv = add_mv(self.mvd_l0[mbPartIdx][0], mv_pred)
+                self.mv_l0[mbPartIdx][0] = mv
                 if self.MbPartWidth == 16:
                     # width = 16 height = 8
                     self.set_mv(0, self.MbPartHeight * mbPartIdx, self.MbPartWidth, self.MbPartHeight, mv, ref_idx)
                 else:
                     # width = 8 height = 16
                     self.set_mv(self.MbPartWidth * mbPartIdx, 0, self.MbPartWidth, self.MbPartHeight, mv, ref_idx)
-                print('mbIdx:{} mbPartIdx:{} mvd:{} mv:{}'.format(self.idx, mbPartIdx, self.mvd_l0[mbPartIdx][0], mv))
+                # print('mbIdx:{} mbPartIdx:{} mvd:{} mv:{}'.format(self.idx, mbPartIdx, self.mvd_l0[mbPartIdx][0], mv))
         else:
             if self.NumMbPart == 1:
                 (neighbor_a, neighbor_b, neighbor_c) = self.get_mvp_neighbor(0, 0)
@@ -375,14 +401,15 @@ class Macroblock:
                 if self.mb_type == 'P_Skip' and ( zero_mv_a or zero_mv_b ):
                     # 8.4.1.1 Derivation process for luma motion vectors for skipped macroblocks in P and SP slices
                     self.set_mv(0, 0, self.MbPartWidth, self.MbPartHeight, [0, 0], 0)
-                    print('skip mbIdx:{} mvd:{} mv:{}'.format(self.idx, self.mvd_l0[0][0], [0, 0]))
+                    # print('skip mbIdx:{} mvd:{} mv:{}'.format(self.idx, self.mvd_l0[0][0], [0, 0]))
                     return
 
                 ref_idx = self.ref_idx_l0[0]
                 mv_pred = self.get_mvp_normal(ref_idx, neighbor_a, neighbor_b, neighbor_c)
                 mv = add_mv(self.mvd_l0[0][0], mv_pred)
+                self.mv_l0[0][0] = mv
                 self.set_mv(0, 0, self.MbPartWidth, self.MbPartHeight, mv, ref_idx)
-                print('mbIdx:{} mvd:{} mv:{}'.format(self.idx, self.mvd_l0[0][0], mv))
+                # print('mbIdx:{} mvd:{} mv:{}'.format(self.idx, self.mvd_l0[0][0], mv))
             else:
                 # P_8x8 P_8x8ref0
                 for mbPartIdx in range(4):
@@ -392,6 +419,7 @@ class Macroblock:
                         ref_idx = self.ref_idx_l0[mbPartIdx]
                         mv_pred = self.get_mvp_normal(ref_idx, neighbor_a, neighbor_b, neighbor_c)
                         mv = add_mv(self.mvd_l0[mbPartIdx][subMbPartIdx], mv_pred)
+                        self.mv_l0[mbPartIdx][subMbPartIdx] = mv
 
                         x = InverseRasterScan(mbPartIdx, self.MbPartWidth, self.MbPartHeight, 16, 0)
                         y = InverseRasterScan(mbPartIdx, self.MbPartWidth, self.MbPartHeight, 16, 1)
@@ -402,7 +430,7 @@ class Macroblock:
                         s_x = x + xS
                         s_y = y + yS
                         self.set_mv(s_x, s_y, self.SubMbPartWidth(s_m_t), self.SubMbPartHeight(s_m_t), mv, ref_idx)
-                        print('mbIdx:{} mbPartIdx{} subMbPartIdx{} mvd:{} mv:{}'.format(self.idx, mbPartIdx, subMbPartIdx, self.mvd_l0[0][0], mv))
+                        # print('mbIdx:{} mbPartIdx{} subMbPartIdx{} mvd:{} mv:{}'.format(self.idx, mbPartIdx, subMbPartIdx, self.mvd_l0[0][0], mv))
 
 
 

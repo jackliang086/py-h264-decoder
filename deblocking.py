@@ -49,7 +49,7 @@ def deblock_mb(mb):
     for edge in range(4):
         if (mb.CodedBlockPatternLuma == 0 and mb.CodedBlockPatternChroma == 0) and (mb.slice.slice_type == 'P' or mb.slice.slice_type == 'B'):
             if edge > 0:
-                if (mb.mb_type == 'P_Skip' and mb.slice.slice_type == 'P') or mb.mb_type == 'P_L0_16x16' or mb.mb_typ == 'P_L0_L0_16x8':
+                if (mb.mb_type == 'P_Skip' and mb.slice.slice_type == 'P') or mb.mb_type == 'P_L0_16x16' or mb.mb_type == 'P_L0_L0_16x8':
                     continue
                 elif (edge & 0x01) and mb.mb_type == 'P_L0_L0_8x16':
                     continue
@@ -68,7 +68,7 @@ def deblock_mb(mb):
     for edge in range(4):
         if (mb.CodedBlockPatternLuma == 0 and mb.CodedBlockPatternChroma == 0) and (mb.slice.slice_type == 'P' or mb.slice.slice_type == 'B'):
             if edge > 0:
-                if (mb.mb_type == 'P_Skip' and mb.slice.slice_type == 'P') or mb.mb_type == 'P_L0_16x16' or mb.mb_typ == 'P_L0_L0_8x16':
+                if (mb.mb_type == 'P_Skip' and mb.slice.slice_type == 'P') or mb.mb_type == 'P_L0_16x16' or mb.mb_type == 'P_L0_L0_8x16':
                     continue
                 elif (edge & 0x01) and mb.mb_type == 'P_L0_L0_16x8':
                     continue
