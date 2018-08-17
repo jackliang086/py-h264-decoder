@@ -22,4 +22,4 @@ The program can be executed as:
 
 Then, the output folder will have the images that is the decoded frame. As shown below:
 
-    ![](http://thyrsi.com/t6/358/1534492653x-1404755576.jpg)
+    ![Image](http://thyrsi.com/t6/358/1534492653x-1404755576.jpg)
